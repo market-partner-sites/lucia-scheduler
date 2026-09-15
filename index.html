@@ -240,6 +240,17 @@
   .lesson-row .lmeta{font-size:.85rem; opacity:.6;}
   .lesson-row .lbooks{font-size:.85rem; font-weight:700; opacity:.85; margin-top:2px;}
 
+  .lesson-row.club-row{
+    margin-top:8px;
+    padding:12px 14px;
+    border-radius:var(--radius-md);
+    border-bottom:none;
+    background:linear-gradient(120deg,#ffb347,#ff8a3d);
+    color:#241d3b;
+  }
+  .lesson-row.club-row .lt{opacity:.75; color:#241d3b;}
+  .lesson-row.club-row .lmeta{opacity:.75; color:#241d3b;}
+
   .preview-strip{
     display:flex;
     flex-wrap:wrap;
@@ -454,7 +465,7 @@
   // Bumped by Claude on every deploy so an already-open page (e.g. left
   // open on a home-screen device and never manually refreshed) can notice
   // there's a newer version and reload itself — see checkForUpdate() below.
-  var BUILD_VERSION = '2026-09-15T22:15:00Z';
+  var BUILD_VERSION = '2026-09-15T23:00:00Z';
 
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -513,6 +524,9 @@
       5:{school:true, activity:'', kit:''},
       6:{school:false, activity:'', kit:''}
     },
+    clubs:[
+      {label:'Gymnastics', icon:'🤸', time:'18:50', days:[2,5]} // Tuesday & Friday, 6:50pm
+    ],
     termReminders:[
       {date:'2026-11-04', label:'Back from October half term'},
       {date:'2027-01-04', label:'Spring term starts'},
@@ -771,6 +785,17 @@
     var note = '';
     if(override && override.noteDate === iso && override.noteText){ note = override.noteText; }
     var lessons = timetableFor(cfg, letter, dow);
+    (cfg.clubs || []).forEach(function(c){
+      if((c.days || []).indexOf(dow) === -1) return;
+      lessons.push({
+        time: c.time,
+        subject: (c.icon ? c.icon + ' ' : '') + c.label,
+        teacher: 'Club',
+        room: '',
+        books: '',
+        club: true
+      });
+    });
     return { iso:iso, dow:dow, school:school, activity:activity, kit:kit, note:note, weekLetter:letter, lessons:lessons };
   }
 
@@ -906,7 +931,7 @@
       lessonsCard.hidden = false;
       document.getElementById('lessonsTitle').textContent = (view.mode === 'morning' ? "Today's lessons & books needed" : "Tomorrow's lessons & books needed") + ' (Week ' + info.weekLetter + ')';
       document.getElementById('lessonsList').innerHTML = info.lessons.map(function(l){
-        return '<li class="lesson-row">' +
+        return '<li class="lesson-row' + (l.club ? ' club-row' : '') + '">' +
           '<span class="lt">' + escapeHtml(l.time) + '</span>' +
           '<span class="lmain"><span class="lsub">' + escapeHtml(l.subject) + '</span>' +
             '<span class="lmeta">' + escapeHtml(l.teacher) + (l.room ? ' · ' + escapeHtml(l.room) : '') + '</span>' +
