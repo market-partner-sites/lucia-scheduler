@@ -189,6 +189,8 @@
   .mode-morning .check-row{background:var(--morning-bg-1);}
   .check-row.kit-row{border-color:var(--evening-accent-2);}
   .mode-morning .check-row.kit-row{border-color:var(--morning-accent);}
+  .check-row.has-sub{align-items:flex-start; padding-top:12px; padding-bottom:12px;}
+  .check-row.has-sub .box, .check-row.has-sub .ic{margin-top:2px;}
   .check-row .box{
     width:30px;height:30px;flex:0 0 auto;
     border-radius:9px;
@@ -210,8 +212,11 @@
     color:#fff;
   }
   .check-row .ic{font-size:1.4rem;}
+  .check-row .txt{display:flex; flex-direction:column; gap:3px; min-width:0;}
   .check-row .lbl{font-size:1.12rem; font-weight:700;}
   .check-row.checked .lbl{text-decoration:line-through; opacity:.55;}
+  .check-row .sub{font-size:.85rem; font-weight:600; opacity:.65; line-height:1.35;}
+  .check-row.checked .sub{opacity:.4;}
 
   .lessons-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
   .lesson-row{
@@ -320,6 +325,18 @@
     width:30px; height:30px; border-radius:50%; font-size:.9rem; cursor:pointer; flex:0 0 auto;
   }
 
+  .sunday-banner{
+    padding:26px 20px;
+    border-radius:var(--radius-lg);
+    background:linear-gradient(120deg,#ff9a9e,#fecfef 50%,#a18cd1);
+    color:#241d3b;
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:1.5rem;
+    line-height:1.3;
+    text-align:center;
+  }
+
   /* ---------- info modal ---------- */
   .overlay{
     position:fixed; inset:0;
@@ -368,6 +385,9 @@
     <span id="termBannerText"></span>
     <button id="termBannerDismiss" aria-label="Dismiss">✕</button>
   </div>
+
+  <div class="sunday-banner" id="saturdayBanner" hidden>Hoorah, its Saturday!</div>
+  <div class="sunday-banner" id="sundayBanner" hidden>Hoy, hoy es domingo! No hay compromiso con el reloj</div>
 
   <div class="board-header">
     <div>
@@ -430,7 +450,7 @@
   // Bumped by Claude on every deploy so an already-open page (e.g. left
   // open on a home-screen device and never manually refreshed) can notice
   // there's a newer version and reload itself — see checkForUpdate() below.
-  var BUILD_VERSION = '2026-09-16T00:00:00Z';
+  var BUILD_VERSION = '2026-09-16T01:15:00Z';
 
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -457,18 +477,16 @@
     alternates:true,
     weekAnchorMonday:'2026-09-14',
     weekAnchorLetter:'B',
-    schoolDayItem:{icon:'🪪', label:'Lanyard in bag'},
     beforeBed:[
-      {icon:'🎒', label:'School bag packed'},
-      {icon:'💧', label:'Water bottle ready'},
+      {icon:'🎒', label:'School bag packed', sub:'See below for books needed, fill water bottle, lanyard in bag'},
       {icon:'👕', label:'Clothes ready'},
       {icon:'👟', label:'Shoes by the door'}
     ],
     morningRoutine:[
+      {icon:'👕', label:'Get dressed + hair'},
+      {icon:'🎒', label:'Bag', sub:'See below for books needed, fill water bottle, lanyard in bag'},
       {icon:'🥣', label:'Breakfast'},
-      {icon:'🪥', label:'Teeth + hair'},
-      {icon:'👕', label:'Get dressed'},
-      {icon:'🎒', label:'Bag'},
+      {icon:'🪥', label:'Teeth'},
       {icon:'👟', label:'Shoes'}
     ],
     weeklyA:{
@@ -837,6 +855,8 @@
     var cfg = CONFIG;
     updateTermBanner(cfg);
     var now = new Date();
+    document.getElementById('saturdayBanner').hidden = now.getDay() !== 6;
+    document.getElementById('sundayBanner').hidden = now.getDay() !== 0;
     var forced = forcedMode();
     var view = forced === 'auto' ? computeView(cfg, now) : { mode: forced, targetDate: forced==='morning' ? now : (nowMinutes(now) < timeToMinutes(cfg.morningStart) ? now : addDays(now,1)) };
 
@@ -884,13 +904,11 @@
       checklistTitle.textContent = 'Evening checklist';
       items = (cfg.beforeBed||[]).slice();
       if(info.kit){ items.splice(Math.min(1, items.length), 0, {icon:'🎽', label:info.kit, kit:true}); }
-      if(info.school && cfg.schoolDayItem && cfg.schoolDayItem.label){ items.push(cfg.schoolDayItem); }
       storeKey = 'evening';
     } else {
       checklistTitle.textContent = 'Morning checklist';
       items = (cfg.morningRoutine||[]).slice();
       if(info.kit){ items.splice(Math.min(1, items.length), 0, {icon:'🎽', label:'Grab: ' + info.kit, kit:true}); }
-      if(info.school && cfg.schoolDayItem && cfg.schoolDayItem.label){ items.push(cfg.schoolDayItem); }
       storeKey = 'morning';
     }
     var activeChecks = getChecks(storeKey, info.iso);
@@ -898,10 +916,12 @@
     checklistEl.innerHTML = items.map(function(it, idx){
       var key = 'i' + idx;
       var checked = !!activeChecks[key];
-      return '<li class="check-row' + (checked?' checked':'') + (it.kit?' kit-row':'') + '" data-key="' + key + '" data-store="' + storeKey + '" data-date="' + info.iso + '">' +
+      return '<li class="check-row' + (checked?' checked':'') + (it.kit?' kit-row':'') + (it.sub?' has-sub':'') + '" data-key="' + key + '" data-store="' + storeKey + '" data-date="' + info.iso + '">' +
         '<span class="box">' + (checked?'✓':'') + '</span>' +
         '<span class="ic">' + escapeHtml(it.icon||'') + '</span>' +
-        '<span class="lbl">' + escapeHtml(it.label||'') + '</span>' +
+        '<span class="txt"><span class="lbl">' + escapeHtml(it.label||'') + '</span>' +
+          (it.sub ? '<span class="sub">' + escapeHtml(it.sub) + '</span>' : '') +
+        '</span>' +
       '</li>';
     }).join('') || '<div class="empty-note">Nothing on the list yet.</div>';
 
