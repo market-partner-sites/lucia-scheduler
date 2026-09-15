@@ -91,10 +91,10 @@
     justify-content:space-between;
     gap:12px;
   }
-  .greeting-emoji{font-size:2.6rem; line-height:1;}
   .greeting-text{
     font-size:1.9rem;
     font-weight:700;
+    padding-top:10px;
   }
   .day-line{
     font-size:1.05rem;
@@ -104,6 +104,21 @@
   }
   .mode-evening .day-line{color:var(--evening-text-dim);}
   .mode-morning .day-line{color:var(--morning-text-dim);}
+
+  .header-right{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:8px;
+    flex:0 0 auto;
+  }
+  .clock{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:1.35rem;
+    font-variant-numeric:tabular-nums;
+    opacity:.9;
+  }
 
   .gear-btn{
     appearance:none;
@@ -267,6 +282,49 @@
 
   .empty-note{opacity:.6; font-size:.98rem;}
 
+  .wake-alarm{
+    position:fixed;
+    top:calc(env(safe-area-inset-top, 0px) + 16px);
+    left:20px;
+    right:20px;
+    max-width:680px;
+    margin:0 auto;
+    z-index:30;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+    padding:24px 20px;
+    border-radius:var(--radius-lg);
+    background:linear-gradient(120deg,#ffb347,#ff8a3d);
+    color:#241d3b;
+    text-align:center;
+    box-shadow:0 14px 34px rgba(0,0,0,.35);
+    animation:wake-pulse 1.6s ease-in-out infinite;
+  }
+  .wake-alarm-text{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:1.3rem;
+  }
+  .wake-alarm-stop{
+    appearance:none;
+    border:none;
+    background:#fff;
+    color:#ff8a3d;
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:1.15rem;
+    padding:13px 30px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  .wake-alarm-stop:active{transform:scale(.96);}
+  @keyframes wake-pulse{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.02); }
+  }
+
   .term-banner{
     display:flex;
     align-items:center;
@@ -323,6 +381,11 @@
 </head>
 <body>
 <div id="app">
+  <div class="wake-alarm" id="wakeAlarm" hidden>
+    <div class="wake-alarm-text">⏰ Good morning, Lucia! Time to get up!</div>
+    <button class="wake-alarm-stop" id="wakeAlarmStop">I'm up! ☀️</button>
+  </div>
+
   <div class="term-banner" id="termBanner" hidden>
     <span id="termBannerText"></span>
     <button id="termBannerDismiss" aria-label="Dismiss">✕</button>
@@ -330,11 +393,13 @@
 
   <div class="board-header">
     <div>
-      <div class="greeting-emoji" id="greetingEmoji">🌙</div>
       <div class="greeting-text" id="greetingText">Loading…</div>
       <div class="day-line" id="dayLine"></div>
     </div>
-    <button class="gear-btn" id="gearBtn" aria-label="About this board" title="About this board">⚙️</button>
+    <div class="header-right">
+      <div class="clock" id="clock"></div>
+      <button class="gear-btn" id="gearBtn" aria-label="About this board" title="About this board">⚙️</button>
+    </div>
   </div>
 
   <div class="badge-row" id="badgeRow"></div>
@@ -366,6 +431,7 @@
     <fieldset>
       <legend>Current times</legend>
       <div class="info-row"><span>Wake</span><span id="infoWake"></span></div>
+      <div class="info-row"><span>Wake sound</span><span id="infoAlarmStatus"></span></div>
       <div class="info-row"><span>Out the door</span><span id="infoLeave"></span></div>
       <div class="info-row"><span>Switches to evening</span><span id="infoEvening"></span></div>
       <div class="info-row"><span>Switches to morning</span><span id="infoMorning"></span></div>
@@ -385,6 +451,11 @@
 (function(){
   "use strict";
 
+  // Bumped by Claude on every deploy so an already-open page (e.g. left
+  // open on a home-screen device and never manually refreshed) can notice
+  // there's a newer version and reload itself — see checkForUpdate() below.
+  var BUILD_VERSION = '2026-09-15T21:30:00Z';
+
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var PERIOD_META = [
@@ -403,6 +474,7 @@
   var CONFIG = {
     childName:'Lucia',
     wakeTime:'07:00',
+    alarmEnabled:true,
     leaveTime:'08:00',
     eveningStart:'17:00',
     morningStart:'06:30',
@@ -486,6 +558,149 @@
     var parts = t.split(':'); return (+parts[0])*60 + (+parts[1]||0);
   }
   function nowMinutes(d){ return d.getHours()*60 + d.getMinutes(); }
+
+  // ---------------- live clock ----------------
+  function updateClock(){
+    var el = document.getElementById('clock');
+    if(!el) return;
+    var now = new Date();
+    el.textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+  }
+
+  // ---------------- wake-up alarm (school mornings only) ----------------
+  // Uses the Web Audio API to play a short original chime — no external
+  // audio file, so nothing to license or host. Browsers block sound from
+  // starting on its own; one tap/touch anywhere on the page "unlocks" it
+  // for as long as the page stays open (see unlockAudio below), which is
+  // why the board is meant to stay open on a plugged-in, always-on screen
+  // rather than being refreshed or reopened each day.
+  var audioCtx = null;
+  var audioUnlocked = false;
+
+  function ensureAudioCtx(){
+    if(!audioCtx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(AC){ try{ audioCtx = new AC(); }catch(e){} }
+    }
+    return audioCtx;
+  }
+
+  function unlockAudio(){
+    if(audioUnlocked) return;
+    var ctx = ensureAudioCtx();
+    if(!ctx) return;
+    if(ctx.state === 'suspended'){ ctx.resume(); }
+    try{
+      var buffer = ctx.createBuffer(1, 1, 22050);
+      var src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(ctx.destination);
+      src.start(0);
+    }catch(e){}
+    audioUnlocked = true;
+    updateAlarmStatus();
+  }
+  document.addEventListener('pointerdown', unlockAudio, {passive:true});
+  document.addEventListener('click', unlockAudio, {passive:true});
+
+  function updateAlarmStatus(){
+    var el = document.getElementById('infoAlarmStatus');
+    if(!el) return;
+    el.textContent = audioUnlocked ? '🔔 Ready' : '🔕 Tap the screen once to enable';
+  }
+
+  function playChimeOnce(){
+    var ctx = ensureAudioCtx();
+    if(!ctx) return;
+    if(ctx.state === 'suspended'){ ctx.resume(); }
+    var notes = [523.25, 659.25, 783.99, 1046.5]; // bright ascending C-E-G-C chime
+    var t0 = ctx.currentTime;
+    notes.forEach(function(freq, i){
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      var start = t0 + i * 0.18;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.28, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.6);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.65);
+    });
+  }
+
+  var alarmState = { active:false, intervalId:null, stopTimeoutId:null };
+  function startAlarm(){
+    if(alarmState.active) return;
+    alarmState.active = true;
+    var banner = document.getElementById('wakeAlarm');
+    if(banner) banner.hidden = false;
+    playChimeOnce();
+    alarmState.intervalId = setInterval(playChimeOnce, 15000);
+    alarmState.stopTimeoutId = setTimeout(stopAlarm, 3 * 60 * 1000); // safety auto-stop
+  }
+  function stopAlarm(){
+    if(!alarmState.active) return;
+    alarmState.active = false;
+    clearInterval(alarmState.intervalId);
+    clearTimeout(alarmState.stopTimeoutId);
+    var banner = document.getElementById('wakeAlarm');
+    if(banner) banner.hidden = true;
+  }
+
+  function checkAlarm(cfg, now){
+    if(!cfg.alarmEnabled) return;
+    var todayInfo = dayInfoFor(cfg, OVERRIDE, now);
+    if(!todayInfo.school) return;
+    var playedKey = 'lucia_alarm_played_' + todayInfo.iso;
+    var already = false;
+    try{ already = localStorage.getItem(playedKey) === '1'; }catch(e){}
+    if(already) return;
+    var wakeMin = timeToMinutes(cfg.wakeTime);
+    var nowMin = nowMinutes(now);
+    if(nowMin >= wakeMin && nowMin < wakeMin + 2){
+      try{ localStorage.setItem(playedKey, '1'); }catch(e){}
+      startAlarm();
+    }
+  }
+
+  // ---------------- daily check for a newer deployed version ----------------
+  // This page's data is baked in at load time — if it's never reopened or
+  // refreshed (e.g. left running on a home-screen device), schedule/data
+  // changes Claude publishes later won't show up on their own. This does
+  // one quiet self-fetch a day, away from the morning alarm and evening
+  // routine, and reloads only if a newer BUILD_VERSION is found.
+  function checkForUpdate(){
+    try{
+      fetch(location.pathname + '?_=' + Date.now(), {cache:'no-store'})
+        .then(function(res){ return res.text(); })
+        .then(function(html){
+          var m = html.match(/BUILD_VERSION\s*=\s*'([^']+)'/);
+          if(m && m[1] && m[1] !== BUILD_VERSION){ location.reload(); }
+        })
+        .catch(function(){});
+    }catch(e){}
+  }
+  function maybeCheckForUpdate(now){
+    var key = 'lucia_update_check_' + isoDate(now);
+    var already = false;
+    try{ already = localStorage.getItem(key) === '1'; }catch(e){}
+    if(already) return;
+    var nowMin = nowMinutes(now);
+    if(nowMin >= timeToMinutes('12:00') && nowMin < timeToMinutes('12:00') + 5){
+      try{ localStorage.setItem(key, '1'); }catch(e){}
+      checkForUpdate();
+    }
+  }
+
+  function tick(){
+    updateClock();
+    var now = new Date();
+    checkAlarm(CONFIG, now);
+    maybeCheckForUpdate(now);
+  }
 
   function computeView(cfg, now){
     var eveningStart = timeToMinutes(cfg.eveningStart);
@@ -628,15 +843,12 @@
     var dateStr = dayName + ' ' + dateObj.getDate() + ' ' + MONTH_NAMES[dateObj.getMonth()];
 
     var greetEl = document.getElementById('greetingText');
-    var emojiEl = document.getElementById('greetingEmoji');
     var dayLine = document.getElementById('dayLine');
 
     if(view.mode === 'morning'){
-      emojiEl.textContent = '☀️';
       greetEl.textContent = 'Good morning, ' + (cfg.childName||'') + '!';
       dayLine.textContent = 'Today: ' + dateStr;
     } else {
-      emojiEl.textContent = '🌙';
       greetEl.textContent = 'Ready for tomorrow, ' + (cfg.childName||'') + '?';
       dayLine.textContent = dateStr;
     }
@@ -744,6 +956,7 @@
   var infoOverlay = document.getElementById('infoOverlay');
   gearBtn.addEventListener('click', function(){
     document.getElementById('infoWake').textContent = CONFIG.wakeTime;
+    updateAlarmStatus();
     document.getElementById('infoLeave').textContent = CONFIG.leaveTime;
     document.getElementById('infoEvening').textContent = CONFIG.eveningStart;
     document.getElementById('infoMorning').textContent = CONFIG.morningStart;
@@ -761,10 +974,15 @@
     b.classList.add('active');
     render();
   });
+  document.getElementById('wakeAlarmStop').addEventListener('click', function(){
+    stopAlarm();
+  });
 
   // ---------------- boot ----------------
   render();
   setInterval(render, 30000);
+  tick();
+  setInterval(tick, 1000);
 })();
 </script>
 </body>
