@@ -80,10 +80,6 @@
     justify-content:center;
     gap:22px;
   }
-  body.has-leave-bar #app{
-    padding-bottom:calc(96px + env(safe-area-inset-bottom,0px));
-  }
-
   /* ---------- header ---------- */
   .board-header{
     display:flex;
@@ -262,35 +258,6 @@
   .preview-strip .pi{display:flex; align-items:center; gap:6px;}
   .preview-strip .arrow{opacity:.4;}
 
-  .leave-bar{
-    position:fixed;
-    left:20px;
-    right:20px;
-    bottom:calc(env(safe-area-inset-bottom, 0px) + 16px);
-    max-width:680px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:10px;
-    padding:18px;
-    border-radius:var(--radius-lg);
-    font-family:'Baloo 2',sans-serif;
-    font-size:1.3rem;
-    font-weight:700;
-    background:var(--evening-surface-2);
-    box-shadow:0 8px 24px rgba(0,0,0,.25);
-    z-index:10;
-  }
-  .mode-morning .leave-bar{
-    background:linear-gradient(120deg,var(--morning-accent),#ffb15e);
-    color:#fff;
-  }
-  .mode-evening .leave-bar{
-    background:linear-gradient(120deg,var(--evening-accent-2),#6a63e0);
-    color:#fff;
-  }
-
   .empty-note{opacity:.6; font-size:.98rem;}
 
   .wake-alarm{
@@ -429,8 +396,6 @@
     <h2>Tomorrow morning</h2>
     <div class="preview-strip" id="previewStrip"></div>
   </div>
-
-  <div class="leave-bar" id="leaveBar" hidden></div>
 </div>
 
 <!-- Info overlay -->
@@ -465,7 +430,7 @@
   // Bumped by Claude on every deploy so an already-open page (e.g. left
   // open on a home-screen device and never manually refreshed) can notice
   // there's a newer version and reload itself — see checkForUpdate() below.
-  var BUILD_VERSION = '2026-09-15T23:00:00Z';
+  var BUILD_VERSION = '2026-09-16T00:00:00Z';
 
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -525,7 +490,9 @@
       6:{school:false, activity:'', kit:''}
     },
     clubs:[
-      {label:'Gymnastics', icon:'🤸', time:'18:50', days:[2,5]} // Tuesday & Friday, 6:50pm
+      {label:'Gymnastics', icon:'🤸', time:'18:50–19:50', days:[2,5]}, // Tuesday & Friday, 6:50-7:50pm
+      {label:'Tennis', icon:'🎾', time:'16:00–17:00', days:[5]}, // Friday, 4:00-5:00pm
+      {label:'Drama', icon:'🎭', time:'15:20–16:50', days:[3]} // Wednesday, 3:20-4:50pm
     ],
     termReminders:[
       {date:'2026-11-04', label:'Back from October half term'},
@@ -570,6 +537,14 @@
   function timeToMinutes(t){
     if(!t) return 0;
     var parts = t.split(':'); return (+parts[0])*60 + (+parts[1]||0);
+  }
+  // For a plain 'HH:MM' this is the same as timeToMinutes. For a range like
+  // '15:20–16:50' (club times), takes the start of the range first so the
+  // minutes aren't mangled by the dash landing inside the split.
+  function startMinutesOf(t){
+    if(!t) return 0;
+    var start = String(t).split(/[–-]/)[0];
+    return timeToMinutes(start.trim());
   }
   function nowMinutes(d){ return d.getHours()*60 + d.getMinutes(); }
 
@@ -785,8 +760,13 @@
     var note = '';
     if(override && override.noteDate === iso && override.noteText){ note = override.noteText; }
     var lessons = timetableFor(cfg, letter, dow);
-    (cfg.clubs || []).forEach(function(c){
-      if((c.days || []).indexOf(dow) === -1) return;
+    var todaysClubs = (cfg.clubs || []).filter(function(c){
+      return (c.days || []).indexOf(dow) !== -1;
+    });
+    todaysClubs.sort(function(a, b){
+      return startMinutesOf(a.time) - startMinutesOf(b.time);
+    });
+    todaysClubs.forEach(function(c){
       lessons.push({
         time: c.time,
         subject: (c.icon ? c.icon + ' ' : '') + c.label,
@@ -942,13 +922,10 @@
       lessonsCard.hidden = true;
     }
 
-    // preview strip (evening only) / leave bar (morning only)
+    // preview strip (evening only)
     var previewCard = document.getElementById('previewCard');
-    var leaveBar = document.getElementById('leaveBar');
     if(view.mode === 'evening'){
       previewCard.hidden = false;
-      leaveBar.hidden = true;
-      document.body.classList.remove('has-leave-bar');
       var strip = document.getElementById('previewStrip');
       strip.innerHTML =
         '<span class="pi">⏰ Wake ' + escapeHtml(cfg.wakeTime) + '</span><span class="arrow">→</span>' +
@@ -957,9 +934,6 @@
         '<span class="pi">🚪 Leave ' + escapeHtml(cfg.leaveTime) + '</span>';
     } else {
       previewCard.hidden = true;
-      leaveBar.hidden = false;
-      document.body.classList.add('has-leave-bar');
-      leaveBar.innerHTML = '🚪 Out the door: ' + escapeHtml(cfg.leaveTime);
     }
   }
 
