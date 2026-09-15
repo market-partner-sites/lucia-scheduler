@@ -72,7 +72,7 @@
   #app{
     max-width:720px;
     margin:0 auto;
-    padding:28px 20px calc(28px + env(safe-area-inset-bottom,0px));
+    padding:calc(28px + env(safe-area-inset-top,0px)) 20px calc(28px + env(safe-area-inset-bottom,0px));
     min-height:100%;
     min-height:100dvh;
     display:flex;
@@ -454,7 +454,7 @@
   // Bumped by Claude on every deploy so an already-open page (e.g. left
   // open on a home-screen device and never manually refreshed) can notice
   // there's a newer version and reload itself — see checkForUpdate() below.
-  var BUILD_VERSION = '2026-09-15T21:30:00Z';
+  var BUILD_VERSION = '2026-09-15T22:15:00Z';
 
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
