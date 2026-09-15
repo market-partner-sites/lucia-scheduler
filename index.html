@@ -38,6 +38,7 @@
   }
 
   *{box-sizing:border-box;}
+  [hidden]{display:none!important;}
   html,body{height:100%;}
   body{
     margin:0;
@@ -71,6 +72,9 @@
     display:flex;
     flex-direction:column;
     gap:22px;
+  }
+  body.has-leave-bar #app{
+    padding-bottom:calc(96px + env(safe-area-inset-bottom,0px));
   }
 
   /* ---------- header ---------- */
@@ -226,9 +230,12 @@
   .preview-strip .arrow{opacity:.4;}
 
   .leave-bar{
-    position:sticky;
-    bottom:0;
-    margin-top:auto;
+    position:fixed;
+    left:20px;
+    right:20px;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 16px);
+    max-width:680px;
+    margin:0 auto;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -239,6 +246,8 @@
     font-size:1.3rem;
     font-weight:700;
     background:var(--evening-surface-2);
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+    z-index:10;
   }
   .mode-morning .leave-bar{
     background:linear-gradient(120deg,var(--morning-accent),#ffb15e);
@@ -694,6 +703,7 @@
     if(view.mode === 'evening'){
       previewCard.hidden = false;
       leaveBar.hidden = true;
+      document.body.classList.remove('has-leave-bar');
       var strip = document.getElementById('previewStrip');
       strip.innerHTML =
         '<span class="pi">⏰ Wake ' + escapeHtml(cfg.wakeTime) + '</span><span class="arrow">→</span>' +
@@ -703,6 +713,7 @@
     } else {
       previewCard.hidden = true;
       leaveBar.hidden = false;
+      document.body.classList.add('has-leave-bar');
       leaveBar.innerHTML = '🚪 Out the door: ' + escapeHtml(cfg.leaveTime);
     }
   }
