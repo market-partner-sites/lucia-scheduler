@@ -450,7 +450,7 @@
   // Bumped by Claude on every deploy so an already-open page (e.g. left
   // open on a home-screen device and never manually refreshed) can notice
   // there's a newer version and reload itself — see checkForUpdate() below.
-  var BUILD_VERSION = '2026-09-16T01:15:00Z';
+  var BUILD_VERSION = '2026-09-15T20:57:00Z';
 
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -903,12 +903,12 @@
     if(view.mode === 'evening'){
       checklistTitle.textContent = 'Evening checklist';
       items = (cfg.beforeBed||[]).slice();
-      if(info.kit){ items.splice(Math.min(1, items.length), 0, {icon:'🎽', label:info.kit, kit:true}); }
+      if(info.kit){ items.splice(Math.min(1, items.length), 0, {icon:'🎽', label:'Put ' + info.kit + ' in bag!', kit:true}); }
       storeKey = 'evening';
     } else {
       checklistTitle.textContent = 'Morning checklist';
       items = (cfg.morningRoutine||[]).slice();
-      if(info.kit){ items.splice(Math.min(1, items.length), 0, {icon:'🎽', label:'Grab: ' + info.kit, kit:true}); }
+      if(info.kit){ items.splice(Math.min(1, items.length), 0, {icon:'🎽', label:'Put ' + info.kit + ' in bag!', kit:true}); }
       storeKey = 'morning';
     }
     var activeChecks = getChecks(storeKey, info.iso);
