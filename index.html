@@ -156,6 +156,10 @@
     background:linear-gradient(120deg,var(--morning-accent),#ff6b6b);
     color:#fff;
   }
+  .badge.club{
+    background:linear-gradient(120deg,#ffb347,#ff8a3d);
+    color:#241d3b;
+  }
   .badge.note{
     background:var(--evening-surface-2);
   }
@@ -450,7 +454,7 @@
   // Bumped by Claude on every deploy so an already-open page (e.g. left
   // open on a home-screen device and never manually refreshed) can notice
   // there's a newer version and reload itself — see checkForUpdate() below.
-  var BUILD_VERSION = '2026-09-16T07:02:00Z';
+  var BUILD_VERSION = '2026-09-16T07:07:00Z';
 
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -895,6 +899,9 @@
       badges.push('<div class="badge">Week ' + escapeHtml(info.weekLetter) + '</div>');
     }
     badges.push('<div class="badge">' + (info.school ? '<span class="ic">🏫</span> School' : '<span class="ic">🏡</span> No school') + '</div>');
+    (info.lessons || []).filter(function(l){ return l.club; }).forEach(function(l){
+      badges.push('<div class="badge club">' + escapeHtml(l.subject) + '</div>');
+    });
     activityLines(info.activity).forEach(function(line){
       badges.push('<div class="badge">' + escapeHtml(line) + '</div>');
     });
