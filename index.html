@@ -450,7 +450,7 @@
   // Bumped by Claude on every deploy so an already-open page (e.g. left
   // open on a home-screen device and never manually refreshed) can notice
   // there's a newer version and reload itself — see checkForUpdate() below.
-  var BUILD_VERSION = '2026-09-15T20:57:00Z';
+  var BUILD_VERSION = '2026-09-16T07:02:00Z';
 
   var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -685,7 +685,17 @@
         .then(function(res){ return res.text(); })
         .then(function(html){
           var m = html.match(/BUILD_VERSION\s*=\s*'([^']+)'/);
-          if(m && m[1] && m[1] !== BUILD_VERSION){ location.reload(); }
+          if(m && m[1] && m[1] !== BUILD_VERSION){
+            // A plain location.reload() isn't guaranteed to bypass the
+            // browser's HTTP cache on every platform (GitHub Pages sends a
+            // short but non-zero cache lifetime) — on a device meant to stay
+            // open for days at a time that's a real risk of "detecting" an
+            // update but silently reloading the same stale page. Navigating
+            // to a URL with a fresh cache-busting query string instead
+            // guarantees a real network fetch, since that exact URL has
+            // never been cached. replace() avoids piling up history entries.
+            location.replace(location.pathname + '?_=' + Date.now());
+          }
         })
         .catch(function(){});
     }catch(e){}
